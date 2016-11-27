@@ -28,7 +28,7 @@ class ScoreServer():
                 self.Log( "R-TEAM Varient \r\n" )
                 
                 self.MechList = MechList().CreateFromConfig( "mechs.conf" )             
-                self.TransponderListener = TransponderListener( self, "COM5", 38400 )
+                self.TransponderListener = TransponderListener( self, "COM3", 38400 )
                 self.SocketServer = SocketServer( self, "", 2525)
                 self.Match = Match( self, mechs=[self.MechList.List[0], self.MechList.List[1]] )
                 
@@ -195,7 +195,7 @@ class SocketClient( ScoreModule ):
                         
 class TransponderListener( ScoreModule ):
 
-        def __init__( self, server, port="COM5", baud=38400 ):
+        def __init__( self, server, port="COM3", baud=38400 ):
                 ScoreModule.__init__( self, server )
                 
                 # Log the creation of a new ScoreModule.
@@ -212,7 +212,7 @@ class TransponderListener( ScoreModule ):
         def Setup( self, port, baud ):
                 self.ScoreServer.Log( "Atempting to setup TransponderListener module..." )
                 try:
-                        self.Xbee = serial.Serial( self.Port, self.Baudrate )
+                        self.Xbee = serial.Serial( self.Port, self.Baudrate, timeout=1 )
                         self.ScoreServer.Log( " TransponderListener setup succesfull! \r\n" )
                         self.StartThread()
                 except:
@@ -250,6 +250,9 @@ class TransponderListener( ScoreModule ):
                                 self.ScoreServer.Log( self.ScoreServer.MechList.MechByID(mechidh).AdjustHP(mechhp) )
                         else:
                                 self.ScoreServer.Log( "Failed packet!", mechidl, mechidh )
+
+                        # Flush Input
+                        self.Xbee.flushInput()
         
         # Read a single byte from xbee. Blocks untill byte is read.
         def ReadByte( self ):
@@ -259,12 +262,11 @@ class TransponderListener( ScoreModule ):
 
         # Send message to set HP on mech
         def WriteHP( self, mechid, hp ):
-                headerstr = "\x55"
                 mechstr1 = chr( mechid )
                 mechstr2 = chr( 255 - mechid )
                 hpstr = chr( hp )
                 self.Xbee.write( "\x55" + mechstr1 + mechstr2 + hpstr )
-                self.ScoreServer.Log( "\x55" + mechstr1 + mechstr2 + hpstr )
+                self.ScoreServer.Log( "Wrote WriteHP Message : " + "\x55" + mechstr1 + mechstr2 + hpstr )
         
 class Match( ScoreModule ):
 
