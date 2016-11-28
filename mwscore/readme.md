@@ -14,16 +14,11 @@ Edit mechs.conf to include mechs
 
 Requires XBEE S1 and XBee explorer hooked up to PC
 
-Scoring Receiver XBEE setup (Send Broadcast message)
-
-    ATBD = 5 (38400bps)ATID = 6200
-    
-    MY   = 6201
-    
-    DL   = FFFF
-    
-    DH   = 0
-    
-    CH   = c
+    Scoring Receiver XBEE setup (Send Broadcast message)
+        ATBD = 5 (38400bps)ATID = 6200
+        MY   = 6201
+        DL   = FFFF
+        DH   = 0
+        CH   = c
 
 Run MWScoreGUI.py to launch scoring system
