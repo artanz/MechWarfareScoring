@@ -7,14 +7,15 @@
 	MY   = 6200 + TRANSPONDER_ID
 	DL   = 6201
 	CH   = c
-
-  Scoring Receiver XBEE setup (Send Broadcast message)
+	
+	Scoring Receiver XBEE setup (Send Broadcast message)
   ATBD = 5 (38400bps)
   ATID = 6200
   MY   = 6201
   DL   = FFFF
   DH   = 0
   CH   = c
+  
 */ 
 
 #include <TimerOne.h>
@@ -190,15 +191,6 @@ void ISRTimer1(){
   Serial.write((uint8_t) (0xff - id));
   Serial.write((uint8_t) panel);
   Serial.write((uint8_t) hitpoint);
-
-  // Debug Messages
-  //Serial.print("ID : ");
-  //Serial.print((uint8_t) id);
-  //Serial.print(" Panel : ");
-  //Serial.print(panel);
-  //Serial.print(" Hit Points : ");
-  //Serial.print(hitpoint);
-  //Serial.print("\n");
 }
 
 void hittp1() {
