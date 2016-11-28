@@ -1,6 +1,7 @@
 /*
 	MWScore Transponder
-	
+  R-Team Robotics Version
+  
 	XBEE setup:
 	ATBD = 5 (38400bps)
 	ATID = 6200
@@ -9,13 +10,12 @@
 	CH   = c
 	
 	Scoring Receiver XBEE setup (Send Broadcast message)
-  ATBD = 5 (38400bps)
-  ATID = 6200
-  MY   = 6201
-  DL   = FFFF
-  DH   = 0
-  CH   = c
-  
+	ATBD = 5 (38400bps)
+	ATID = 6200
+	MY   = 6201
+	DL   = FFFF
+	DH   = 0
+	CH   = c
 */ 
 
 #include <TimerOne.h>
