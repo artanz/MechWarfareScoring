@@ -1,6 +1,6 @@
 /*
 	MWScore Transponder
-  R-Team Robotics Version
+  	R-Team Robotics Version
   
 	XBEE setup:
 	ATBD = 5 (38400bps)
