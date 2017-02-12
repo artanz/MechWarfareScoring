@@ -35,7 +35,7 @@ class ScoreServer():
                 self.StartAll()
                 
         def Log( self, string ):
-                print time.strftime("%I.%M.%S") + ": " + string
+                print( time.strftime("%I.%M.%S") + ": " + string )
                 
         def StartAll( self ):
                 self.TransponderListener.StartThread()
@@ -97,7 +97,7 @@ class SocketServer( ScoreModule ):
                         self.Socket.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
                         self.Socket.bind( ( self.Host, self.Port ) )
                         self.Socket.listen( 5 )
-                        self.ScoreServer.Log( "SocketServer setup succesfull! \r\n" )
+                        self.ScoreServer.Log( "SocketServer setup succesful! \r\n" )
                         self.StartThread()
                 except:
                         self.ScoreServer.Log( "Setup exception! SocketServer not set up. \r\n" )
@@ -108,6 +108,7 @@ class SocketServer( ScoreModule ):
                 while not self.ThreadKill:
                 
                         if self.Socket == None:
+                                self.ScoreServer.Log("No socket found in socket thread; exiting thread.")
                                 time.sleep( 1 )
                                 return
                                 
@@ -117,25 +118,22 @@ class SocketServer( ScoreModule ):
                         for sock in sread:
                                 if sock == self.Socket:
                                         client, address = sock.accept()
-                                        if client.recv( 1024 ) == "add me please":
-                                        
-                                                # add client to server's client list
-                                                self.ScoreServer.Log( "new client added" )
-                                                self.Clients.append( client )
-                                        else:
-                                                client.close()
+                                        self.ScoreServer.Log( "New client connected from " + repr(address) )
+                                        client.send( self.ScoreServer.Match.MatchData() + "\n" )
+                                        self.Clients.append( client )
         
         # Bradcast a message to all of the servers clients. Removes any clients that produce a socket error.
         def Broadcast( self, msg ):
                 for client in self.Clients:
                         try:
-                                client.send( msg )
+                                client.send( msg + "\n" )
                         except socket.error, e:
+                                self.ScoreServer.Log( "Disconnecting client " + repr(client.getpeername()) )
                                 self.Clients.remove( client )
                                 
 class SocketClient( ScoreModule ):
 
-        def __init__( self, host="192.168.1.102", port=2525 ):
+        def __init__( self, host="192.168.1.102", port=2525, notify=None ):
                 ScoreModule.__init__( self )
                 
                 self.Host = host
@@ -147,52 +145,75 @@ class SocketClient( ScoreModule ):
                 self.NumMechs = 2
                 self.MechNames = ["Dummy 1", "Dummy 2"]
                 self.MechHP = [20, 20]
+                self.Notify = notify
                 
-                self.Setup( self.Host, self.Port )
+                self.Setup( host, port )
         
         # Attempt to setup the socket.  
         def Setup( self, host, port ):
                 try:
                         self.Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         self.Socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                        self.Socket.connect((self.Host, self.Port))
-                        self.Socket.send('add me please')
+                        self.Socket.connect((host, port))
+                        self.StartThread()
                 except:
+                        print("Could not connect to " + repr(host) + ":" + repr(port) + ": " + repr(sys.exc_info()))
                         self.Socket = None
         
         # Module's Thread
         def Run( self ):
+                pack = ""
                 while not self.ThreadKill:
                 
                         if self.Socket == None:
                                 time.sleep( 1 )
+                                self.ThreadKill = True
+                                print("No Socket in SocketClient()")
+                                if self.Notify:
+                                        self.Notify(None)
                                 return
                                 
                         try:
                                 data = self.Socket.recv(1024)
                         except:
+                                print("Exception in Socket.recv(): " + repr(sys.exc_info()))
                                 time.sleep( 1 )
+                                self.ThreadKill = True
+                                if self.Notify:
+                                        self.Notify(None)
                                 return
+                        pack = pack + data
+                        while pack.find('\n') != -1:
+                                pieces = pack.split('\n', 1)
+                                data = pieces[0]
+                                pack = pieces[1]
                                 
-                        info = data.split( ":" )
+                                info = data.split( ":" )
+                                
+                                if (len(info)-3)%3 != 0:
+                                        print("Protocol mismatch in SocketClient(): " + data)
+                                        self.ThreadKill = True
+                                        if self.Notify:
+                                                self.Notify(None)
+                                        return
+                                
+                                self.MatchTime = int( info[0] )
+                                self.MatchType = int( info[1] )
+                                self.NumMechs = int( info[2] )
                         
-                        if (len(info)-3)%3 != 0:
-                                return
+                                names = []
+                                hp = []
                         
-                        self.MatchTime = int( info[0] )
-                        self.MatchType = int( info[1] )
-                        self.NumMechs = int( info[2] )
-                
-                        names = []
-                        hp = []
-                
-                        for m in xrange( self.NumMechs ):
-                                names.append( info[3+(3*m)] )
-                                hp.append( int(info[4+(3*m)]) )
-                        
-                        self.MechNames = names
-                        self.MechHP = hp
-                        
+                                for m in xrange( self.NumMechs ):
+                                        names.append( info[3+(3*m)] )
+                                        hp.append( int(info[4+(3*m)]) )
+                                
+                                self.MechNames = names
+                                self.MechHP = hp
+                                if self.Notify:
+                                        self.Notify(zip(self.MechNames, self.MechHP))
+
+
 class TransponderListener( ScoreModule ):
 
         def __init__( self, server, port="COM3", baud=38400 ):
@@ -213,7 +234,7 @@ class TransponderListener( ScoreModule ):
                 self.ScoreServer.Log( "Atempting to setup TransponderListener module..." )
                 try:
                         self.Xbee = serial.Serial( self.Port, self.Baudrate, timeout=1 )
-                        self.ScoreServer.Log( " TransponderListener setup succesfull! \r\n" )
+                        self.ScoreServer.Log( " TransponderListener setup succesful! \r\n" )
                         self.StartThread()
                 except:
                         self.Xbee = None
@@ -232,7 +253,7 @@ class TransponderListener( ScoreModule ):
                         while self.Xbee.inWaiting() != 0:
                                 if self.ThreadKill == True:
                                         return
-                                time.sleep( .1 )
+                                time.sleep( .01 )
                                 
                         # Look for the transponder's header byte
                         while ord( self.ReadByte() ) != 0x55:
