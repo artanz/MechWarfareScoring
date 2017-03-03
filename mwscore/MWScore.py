@@ -281,17 +281,18 @@ class TransponderListener( ScoreModule ):
                         pass
                 return self.Xbee.read()
 
-        # Send message to set HP on mech
-        def WriteHP( self, mechid, hp ):
+        # Send message to setup transponder on mech
+        def WriteTransponder( self, mechid, hp, rules ):
                 mechstr1 = chr( mechid )
                 mechstr2 = chr( 255 - mechid )
                 hpstr = chr( hp )
-                self.Xbee.write( "\x55" + mechstr1 + mechstr2 + hpstr )
-                self.ScoreServer.Log( "Wrote WriteHP Message : " + "\x55" + mechstr1 + mechstr2 + hpstr )
+                rulesstr = chr( rules )
+                self.Xbee.write( "\x55" + mechstr1 + mechstr2 + hpstr + rulesstr )
+                self.ScoreServer.Log( "Wrote Transponder Message : " + "\x55" + mechstr1 + mechstr2 + hpstr + rulesstr )
         
 class Match( ScoreModule ):
 
-        def __init__( self, server, matchtype=MATCH_TEAM, matchlength=4800, mechs=[] ):
+        def __init__( self, server, matchtype=MATCH_TEAM, matchlength=4800, matchrules=0, mechs=[] ):
                 ScoreModule.__init__( self, server )
                 
                 # Log the creation of a new ScoreModule
@@ -300,6 +301,7 @@ class Match( ScoreModule ):
                 # module variables
                 self.MatchType = matchtype
                 self.MatchLength = matchlength
+                self.MatchRules = matchrules
                 self.MechList = mechs
                 self.Time = matchlength
                 self.NumTeams = 0
@@ -392,8 +394,15 @@ class Match( ScoreModule ):
                 self.SetTime( self.MatchLength )
                 for m in self.MechList:
                         m.ResetHP()
-                        self.ScoreServer.TransponderListener.WriteHP( m.ID, m.HP )
+                        self.ScoreServer.TransponderListener.WriteTransponder( m.ID, m.HP, self.MatchRules )
                 self.ScoreServer.Log( "Match reset." )
+
+        # Reset the HP.
+        def ResetHP( self ):
+                for m in self.MechList:
+                        m.ResetHP()
+                        self.ScoreServer.TransponderListener.WriteTransponder( m.ID, m.HP, self.MatchRules )
+                self.ScoreServer.Log( "Reset HP." )
         
         # Checks the match for a win condition.
         def CheckForWin( self ):

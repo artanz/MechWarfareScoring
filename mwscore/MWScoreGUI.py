@@ -20,6 +20,7 @@ class MWScoreFrame( wx.Frame ):
 	ID_MATCHSTART = wx.NewId()
 	ID_MATCHPAUSE = wx.NewId()
 	ID_MATCHRESET = wx.NewId()
+	ID_MATCHRESETHP = wx.NewId()
 	ID_TRANSPONDERSETUP = wx.NewId()
 	ID_SOCKETSETUP = wx.NewId()
 	ID_TRANSPONDERSETUP = wx.NewId()
@@ -50,10 +51,12 @@ class MWScoreFrame( wx.Frame ):
 		self.MatchMenu.Append( self.ID_MATCHSTART, "Start/Resume" )
 		self.MatchMenu.Append(self.ID_MATCHPAUSE, "Pause" )
 		self.MatchMenu.Append(self.ID_MATCHRESET, "Reset" )
+		self.MatchMenu.Append(self.ID_MATCHRESETHP, "Reset HP" )
 		self.Bind( wx.EVT_MENU, self.MatchSetup, id=self.ID_MATCHSETUP )
 		self.Bind( wx.EVT_MENU, self.MatchStart, id=self.ID_MATCHSTART )
 		self.Bind( wx.EVT_MENU, self.MatchPause, id=self.ID_MATCHPAUSE )
 		self.Bind( wx.EVT_MENU, self.MatchReset, id=self.ID_MATCHRESET )
+		self.Bind( wx.EVT_MENU, self.MatchResetHP, id=self.ID_MATCHRESETHP )
 		
 		self.MenuBar.Append( self.FileMenu, "&File" )
 		self.MenuBar.Append( self.MatchMenu, "&Match" )
@@ -83,6 +86,7 @@ class MWScoreFrame( wx.Frame ):
 		MatchLength = None
 		MatchType = None
 		NumTeams = None
+		MatchRuleSet = None
 		MechList = []
 		
 		dlg = MatchDialog(self, -1)
@@ -92,6 +96,12 @@ class MWScoreFrame( wx.Frame ):
 				MatchType = MWScore.MATCH_TEAM
 			else:
 				MatchType = MWScore.MATCH_FFA
+                        if dlg.MatchRulesChoice.GetValue() == "Default":
+                                MatchRuleSet = 0
+                        if dlg.MatchRulesChoice.GetValue() == "Max HP Per Panel":
+                                MatchRuleSet = 1
+                        if dlg.MatchRulesChoice.GetValue() == "Healing":
+                                MatchRuleSet = 2
 			NumTeams = int(dlg.NumTeamsChoice.GetValue())
 			dlg.Destroy()
 		else:
@@ -142,7 +152,7 @@ class MWScoreFrame( wx.Frame ):
 		self.ScoreServer.Match.KillThread()
 		
 		# Create the new match.
-		self.ScoreServer.Match = MWScore.Match( self.ScoreServer, MatchType, MatchLength, MechList )
+		self.ScoreServer.Match = MWScore.Match( self.ScoreServer, MatchType, MatchLength, MatchRuleSet, MechList )
 		
 		# Destroy and recreate a new match panel.
 		self.Panel.Destroy()
@@ -162,6 +172,10 @@ class MWScoreFrame( wx.Frame ):
 	# Reset the match
 	def MatchReset( self, event ):
 		self.ScoreServer.Match.Reset()
+		
+        # Reset the match
+	def MatchResetHP( self, event ):
+		self.ScoreServer.Match.ResetHP()
 		
 	# Opens dialog to configure to ScoreServer's SocketServer
 	def SocketSetup( self, event ):
@@ -203,6 +217,9 @@ class MatchDialog( wx.Dialog ):
 		
 		self.NumTeamsText = wx.StaticText( self, -1, "Number Of Teams: " )
 		self.NumTeamsChoice = wx.ComboBox( self, -1, style=wx.CB_DROPDOWN, choices=["2","3","4","5","6","7","8","9","10"] )
+
+		self.MatchRulesText = wx.StaticText( self, -1, "Ruleset: " )
+		self.MatchRulesChoice = wx.ComboBox( self, -1, style=wx.CB_DROPDOWN, choices=["Default","Max HP Per Panel","Healing"] )
 	
 		self.CancelButton = wx.Button( self, wx.ID_CANCEL, "Cancel" )
 		self.OKButton = wx.Button( self, wx.ID_OK, "OK" )
@@ -211,6 +228,7 @@ class MatchDialog( wx.Dialog ):
 		MatchLengthSizer = wx.BoxSizer( wx.HORIZONTAL )
 		MatchTypeSizer = wx.BoxSizer( wx.HORIZONTAL )
 		NumTeamsSizer = wx.BoxSizer( wx.HORIZONTAL )
+		MatchRulesSizer = wx.BoxSizer( wx.HORIZONTAL )
 		BtnSizer = wx.BoxSizer( wx.HORIZONTAL )
 		
 		MatchLengthSizer.Add( self.MatchLengthText, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
@@ -221,6 +239,9 @@ class MatchDialog( wx.Dialog ):
 		
 		NumTeamsSizer.Add( self.NumTeamsText, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
 		NumTeamsSizer.Add( self.NumTeamsChoice, 2, wx.ALL, 5 )
+
+		MatchRulesSizer.Add( self.MatchRulesText, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+		MatchRulesSizer.Add( self.MatchRulesChoice, 2, wx.ALL, 5 )
 		
 		BtnSizer.Add( self.CancelButton, 0, wx.ALL, 5 )
 		BtnSizer.Add( self.OKButton, 0, wx.ALL, 5 )
@@ -228,6 +249,7 @@ class MatchDialog( wx.Dialog ):
 		TopSizer.Add( MatchLengthSizer, 0, wx.ALL|wx.CENTER, 5 )
 		TopSizer.Add( MatchTypeSizer, 0, wx.ALL|wx.CENTER, 5 )
 		TopSizer.Add( NumTeamsSizer, 0, wx.ALL|wx.CENTER, 5 )
+		TopSizer.Add( MatchRulesSizer, 0, wx.ALL|wx.CENTER, 5 )
 		TopSizer.Add( BtnSizer, 0, wx.ALL|wx.CENTER, 5 )
 		
 		self.SetSizer( TopSizer )
