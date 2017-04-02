@@ -10,6 +10,8 @@ import socket
 import select
 import sys
 import operator
+import os
+import traceback
 
 MATCH_TEAM = 1
 MATCH_FFA = 2
@@ -28,7 +30,10 @@ class ScoreServer():
                 self.Log( "R-TEAM Varient \r\n" )
                 
                 self.MechList = MechList().CreateFromConfig( "mechs.conf" )             
-                self.TransponderListener = TransponderListener( self, "COM3", 38400 )
+                defaultPort = "COM3"
+                if os.name == 'posix':
+                    defaultPort = "/dev/ttyUSB0"
+                self.TransponderListener = TransponderListener( self, defaultPort, 38400 )
                 self.SocketServer = SocketServer( self, "", 2525)
                 self.Match = Match( self, mechs=[self.MechList.List[0], self.MechList.List[1]] )
                 
@@ -99,7 +104,8 @@ class SocketServer( ScoreModule ):
                         self.Socket.listen( 5 )
                         self.ScoreServer.Log( "SocketServer setup succesful! \r\n" )
                         self.StartThread()
-                except:
+                except Exception as x:
+                        traceback.print_exc()
                         self.ScoreServer.Log( "Setup exception! SocketServer not set up. \r\n" )
                         self.Socket = None
         
@@ -234,30 +240,38 @@ class TransponderListener( ScoreModule ):
                 self.ScoreServer.Log( "Atempting to setup TransponderListener module..." )
                 try:
                         self.Xbee = serial.Serial( self.Port, self.Baudrate, timeout=1 )
-                        self.ScoreServer.Log( " TransponderListener setup succesful! \r\n" )
+                        self.ScoreServer.Log( " TransponderListener setup succesful on port " + self.Port + " ! \r\n" )
                         self.StartThread()
-                except:
+                        return True
+                except Exception as x:
                         self.Xbee = None
-                        self.ScoreServer.Log( "Setup exception! TransponderListener not set up. \r\n" )
+                        self.ScoreServer.Log( "Setup exception! TransponderListener not set up. Port " + self.Port + " error " + str(x) + "\r\n" )
+                        return False
         
         # Module's thread.
         def Run( self ):
-                while not self.ThreadKill:
+                try:
+                    while not self.ThreadKill:
                         
                         # Return if xbee is not setup.
                         if self.Xbee == None:
-                                time.sleep( 1 )
+                                self.ScoreServer.Log(" Xbee not set up -- exiting \r\n");
+                                time.sleep( 0.5 )
                                 return
                         
-                        # Wait for data to arrive. Escape if thread gets killed.
-                        while self.Xbee.inWaiting() != 0:
-                                if self.ThreadKill == True:
-                                        return
-                                time.sleep( .01 )
                                 
                         # Look for the transponder's header byte
-                        while ord( self.ReadByte() ) != 0x55:
-                                pass
+                        while True:
+                            if self.ThreadKill == True:
+                                    return
+                            if self.Xbee.inWaiting() == 0:
+                                time.sleep(0.01)
+                                continue
+                            q = self.ReadByte()
+                            if (ord(q) != 0x55):
+                                self.ScoreServer.Log("Skipping byte %r\r\n" % (ord(q),))
+                                continue
+                            break
                                 
                         # Read packet data.
                         mechidh = ord( self.ReadByte() )
@@ -267,19 +281,19 @@ class TransponderListener( ScoreModule ):
                         
                         # Check for valid packet and assign hit if valid.
                         if ( mechidh + mechidl ) == 0xff:
-                                # self.ScoreServer.Log( self.ScoreServer.MechList.MechByID(mechidh).AssignHit() )
-                                self.ScoreServer.Log( self.ScoreServer.MechList.MechByID(mechidh).AdjustHP(mechhp) )
+                                result = self.ScoreServer.MechList.MechByID(mechidh).AdjustHP(mechhp)
+                                self.ScoreServer.Log( result )
                         else:
                                 self.ScoreServer.Log( "Failed packet!", mechidl, mechidh )
-
-                        # Flush Input
-                        self.Xbee.flushInput()
         
+                except Exception as x:
+                    traceback.print_exc();
+                    print("Exiting Xbee thread")
+
         # Read a single byte from xbee. Blocks untill byte is read.
         def ReadByte( self ):
-                while self.Xbee.inWaiting() == 0:
-                        pass
-                return self.Xbee.read()
+                ret = self.Xbee.read()
+                return ret
 
         # Send message to setup transponder on mech
         def WriteTransponder( self, mechid, hp, rules ):

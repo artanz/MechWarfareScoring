@@ -5,6 +5,8 @@
 
 import MWScore
 import wx
+import cPickle as pickle
+import traceback
 
 """
 
@@ -26,7 +28,7 @@ class MWScoreFrame( wx.Frame ):
 	ID_TRANSPONDERSETUP = wx.NewId()
 
 	def __init__( self ):
-		wx.Frame.__init__( self, None, wx.ID_ANY, "MWScore Server", style=wx.DEFAULT_FRAME_STYLE )
+		wx.Frame.__init__( self, None, wx.ID_ANY, style=wx.DEFAULT_FRAME_STYLE, name="MWScore Server" )
 		
 		# MWScore ScoreServer.
 		self.ScoreServer = MWScore.ScoreServer()
@@ -64,7 +66,8 @@ class MWScoreFrame( wx.Frame ):
 		self.MenuBar.Append( self.SocketMenu, "&Socket" )
 		
 		self.SetMenuBar( self.MenuBar )
-		
+
+	
 		# Panel
 		self.Panel = MatchPanel( self, -1 )
 		
@@ -74,7 +77,8 @@ class MWScoreFrame( wx.Frame ):
 		wx.EVT_TIMER( self, self.FRAME_UPDATE_TIMER_ID, self.OnTimer )
 		
 		self.Show( True )
-		
+                self.SetTitle("Mech Warfare Match Score")
+			
 	# Updates the frames panel and Broadcasts match data to clients
 	def OnTimer( self, event ):
 		self.Panel.Refresh()
@@ -88,8 +92,22 @@ class MWScoreFrame( wx.Frame ):
 		NumTeams = None
 		MatchRuleSet = None
 		MechList = []
+
+                try:
+                    f = open("last-match.pkl", "rb")
+                    data = pickle.load(f)
+                    f.close()
+                    MatchLength = data.get("MatchLength", MatchLength)
+                    MatchType = data.get("MatchType", MatchType)
+                    NumTeams = data.get("NumTeams", NumTeams)
+                    MatchRuleSet = data.get("MatchRuleSet", MatchRuleSet)
+                    MechList = data.get("MechList", MechList)
+                except:
+                    pass
+                data = { "MatchLength":MatchLength, "MatchType":MatchType, "NumTeams":NumTeams, "MatchRuleSet":MatchRuleSet, "MechList":MechList }
+
 		
-		dlg = MatchDialog(self, -1)
+		dlg = MatchDialog(self, -1, data)
 		if dlg.ShowModal() == wx.ID_OK:
 			MatchLength = int(dlg.MatchLengthChoice.GetValue()) * 600
 			if dlg.MatchTypeChoice.GetValue() == "Team":
@@ -107,6 +125,7 @@ class MWScoreFrame( wx.Frame ):
 		else:
 			dlg.Destroy()
 			return
+                MechList = []
 			
 		# Reset the Mech List
 		self.ScoreServer.MechList.ResetMechs()
@@ -147,6 +166,11 @@ class MWScoreFrame( wx.Frame ):
 				dlg.Destroy()
 				return
 
+                data = { "MatchLength":MatchLength, "MatchType":MatchType, "NumTeams":NumTeams, "MatchRuleSet":MatchRuleSet, "MechList":MechList }
+                f = open("last-match.pkl", "wb")
+                pickle.dump(data, f)
+                f.close()
+
 		# Stop the frame update timer and current match thread.
 		self.Timer.Stop()
 		self.ScoreServer.Match.KillThread()
@@ -171,11 +195,19 @@ class MWScoreFrame( wx.Frame ):
 		
 	# Reset the match
 	def MatchReset( self, event ):
+            try:
 		self.ScoreServer.Match.Reset()
+            except Exception as x:
+                traceback.print_exc()
+                wx.MessageBox("Exception in Reset:\r\n" + str(x), "Error", wx.OK | wx.ICON_ERROR);
 		
         # Reset the match
 	def MatchResetHP( self, event ):
+            try:
 		self.ScoreServer.Match.ResetHP()
+            except Exception as x:
+                traceback.print_exc()
+                wx.MessageBox("Exception in Reset:\r\n" + str(x), "Error", wx.OK | wx.ICON_ERROR);
 		
 	# Opens dialog to configure to ScoreServer's SocketServer
 	def SocketSetup( self, event ):
@@ -191,6 +223,9 @@ class MWScoreFrame( wx.Frame ):
 		if dlg.ShowModal() == wx.ID_OK:
 			self.ScoreServer.TransponderListener.KillThread()
 			self.ScoreServer.TransponderListener = MWScore.TransponderListener( self.ScoreServer, dlg.PortChoice.GetValue(), int(dlg.BaudChoice.GetValue()) )
+                        if not self.ScoreServer.TransponderListener.Xbee:
+                            wx.MessageBox("Could not open Transponder port " + dlg.PortChoice.GetValue(),
+                                    "Error", wx.OK | wx.ICON_ERROR)
 		dlg.Destroy()
 		
 	# Kills all threads and closes the program
@@ -206,20 +241,31 @@ class MWScoreFrame( wx.Frame ):
 		
 class MatchDialog( wx.Dialog ):
 
-	def __init__( self, parent, id ):
+	def __init__( self, parent, id, data ):
+                print repr(data)
 		wx.Dialog.__init__( self, parent, id, title="New Match Setup" )
 		
 		self.MatchLengthText = wx.StaticText( self, -1, "Match Length:" )
 		self.MatchLengthChoice = wx.ComboBox( self, -1, style=wx.CB_DROPDOWN, choices=["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20"] )
+                if data.get("MatchLength", None) is not None:
+                    self.MatchLengthChoice.SetValue(str(data.get("MatchLength", 0)/600))
 		  
 		self.MatchTypeText = wx.StaticText( self, -1, "Match Type:" )
-		self.MatchTypeChoice = wx.ComboBox( self, -1, style=wx.CB_DROPDOWN, choices=["Team", "Free For All"] )
+                typeChoices = ["Team", "Free For All"]
+		self.MatchTypeChoice = wx.ComboBox( self, -1, style=wx.CB_DROPDOWN, choices=typeChoices )
+                if data.get("MatchType", None) is not None:
+                    self.MatchTypeChoice.SetValue(typeChoices[data.get("MatchType", 1)-1])
 		
 		self.NumTeamsText = wx.StaticText( self, -1, "Number Of Teams: " )
 		self.NumTeamsChoice = wx.ComboBox( self, -1, style=wx.CB_DROPDOWN, choices=["2","3","4","5","6","7","8","9","10"] )
+                if data.get("NumTeams", None) is not None:
+                    self.NumTeamsChoice.SetValue(str(data.get("NumTeams", 0)))
 
 		self.MatchRulesText = wx.StaticText( self, -1, "Ruleset: " )
-		self.MatchRulesChoice = wx.ComboBox( self, -1, style=wx.CB_DROPDOWN, choices=["Default","Max HP Per Panel","Healing"] )
+                rulesChoices = ["Default","Max HP Per Panel","Healing"]
+		self.MatchRulesChoice = wx.ComboBox( self, -1, style=wx.CB_DROPDOWN, choices=rulesChoices )
+                if data.get("MatchRuleSet", None) is not None:
+                    self.MatchRulesChoice.SetValue(str(rulesChoices[data.get("MatchRuleSet", 0)]))
 	
 		self.CancelButton = wx.Button( self, wx.ID_CANCEL, "Cancel" )
 		self.OKButton = wx.Button( self, wx.ID_OK, "OK" )
