@@ -303,6 +303,15 @@ class TransponderListener( ScoreModule ):
                 rulesstr = chr( rules )
                 self.Xbee.write( "\x55" + mechstr1 + mechstr2 + hpstr + rulesstr )
                 self.ScoreServer.Log( "Wrote Transponder Message : " + "\x55" + mechstr1 + mechstr2 + hpstr + rulesstr )
+
+        # Send message to setup transponder ID on mech
+        def WriteTransponderNewID( self, mechid, newmechid ):
+                mechstr1 = chr( mechid )
+                mechstr2 = chr( 255 - mechid )
+                newmechstr1 = chr( newmechid )
+                newmechstr2 = chr( 255 - newmechid )
+                self.Xbee.write( "\xA5" + mechstr1 + mechstr2 + newmechstr1 + newmechstr2 )
+                self.ScoreServer.Log( "Wrote ID Transponder Message : " + "\xA5" + mechstr1 + mechstr2 + newmechstr1 + newmechstr2 )
         
 class Match( ScoreModule ):
 
@@ -417,7 +426,13 @@ class Match( ScoreModule ):
                         m.ResetHP()
                         self.ScoreServer.TransponderListener.WriteTransponder( m.ID, m.HP, self.MatchRules )
                 self.ScoreServer.Log( "Reset HP." )
-        
+
+        # Reset the HP.
+        def UpdateTransponderHP( self ):
+                for m in self.MechList:
+                        self.ScoreServer.TransponderListener.WriteTransponder( m.ID, m.HP, self.MatchRules )
+                self.ScoreServer.Log( "Updated Transponder to Score Server HP." )
+                
         # Checks the match for a win condition.
         def CheckForWin( self ):
         

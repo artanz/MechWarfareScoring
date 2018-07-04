@@ -23,9 +23,11 @@ class MWScoreFrame( wx.Frame ):
 	ID_MATCHPAUSE = wx.NewId()
 	ID_MATCHRESET = wx.NewId()
 	ID_MATCHRESETHP = wx.NewId()
+	ID_MATCHRESTAGING = wx.NewId()
 	ID_TRANSPONDERSETUP = wx.NewId()
 	ID_SOCKETSETUP = wx.NewId()
-	ID_TRANSPONDERSETUP = wx.NewId()
+	ID_TRANSPONDERVAR = wx.NewId()
+	ID_TRANSPONDERHPUPDATE = wx.NewId()
 
 	def __init__( self ):
 		wx.Frame.__init__( self, None, wx.ID_ANY, style=wx.DEFAULT_FRAME_STYLE, name="MWScore Server" )
@@ -44,21 +46,26 @@ class MWScoreFrame( wx.Frame ):
 		self.Bind( wx.EVT_MENU, self.Quit, id=self.ID_QUIT )
 		
 		self.TransponderMenu.Append( self.ID_TRANSPONDERSETUP, "Setup" )
+		self.TransponderMenu.Append( self.ID_TRANSPONDERVAR, "Transponder Variable Setup" )
+		self.TransponderMenu.Append( self.ID_TRANSPONDERHPUPDATE, "Refresh Transponder HP" )
 		self.Bind( wx.EVT_MENU, self.TransponderSetup, id=self.ID_TRANSPONDERSETUP )
+		self.Bind( wx.EVT_MENU, self.TransponderVar, id=self.ID_TRANSPONDERVAR )
+		self.Bind( wx.EVT_MENU, self.TransponderHpUpdate, id=self.ID_TRANSPONDERHPUPDATE )
 		
 		self.SocketMenu.Append( self.ID_SOCKETSETUP, "Setup" )
 		self.Bind( wx.EVT_MENU, self.SocketSetup, id=self.ID_SOCKETSETUP )
 		
 		self.MatchMenu.Append( self.ID_MATCHSETUP, "Setup" )
 		self.MatchMenu.Append( self.ID_MATCHSTART, "Start/Resume" )
-		self.MatchMenu.Append(self.ID_MATCHPAUSE, "Pause" )
-		self.MatchMenu.Append(self.ID_MATCHRESET, "Reset" )
-		self.MatchMenu.Append(self.ID_MATCHRESETHP, "Reset HP" )
+		self.MatchMenu.Append( self.ID_MATCHPAUSE, "Pause" )
+		self.MatchMenu.Append( self.ID_MATCHRESET, "Reset" )
+		self.MatchMenu.Append( self.ID_MATCHRESETHP, "Reset HP" )
+		self.MatchMenu.Append( self.ID_MATCHRESTAGING, "Match Staging" )
 		self.Bind( wx.EVT_MENU, self.MatchSetup, id=self.ID_MATCHSETUP )
 		self.Bind( wx.EVT_MENU, self.MatchStart, id=self.ID_MATCHSTART )
 		self.Bind( wx.EVT_MENU, self.MatchPause, id=self.ID_MATCHPAUSE )
 		self.Bind( wx.EVT_MENU, self.MatchReset, id=self.ID_MATCHRESET )
-		self.Bind( wx.EVT_MENU, self.MatchResetHP, id=self.ID_MATCHRESETHP )
+		self.Bind( wx.EVT_MENU, self.MatchStaging, id=self.ID_MATCHRESTAGING )
 		
 		self.MenuBar.Append( self.FileMenu, "&File" )
 		self.MenuBar.Append( self.MatchMenu, "&Match" )
@@ -120,6 +127,8 @@ class MWScoreFrame( wx.Frame ):
                                 MatchRuleSet = 1
                         if dlg.MatchRulesChoice.GetValue() == "Healing":
                                 MatchRuleSet = 2
+                        if dlg.MatchRulesChoice.GetValue() == "Cooldown Increase":
+                                MatchRuleSet = 3
 			NumTeams = int(dlg.NumTeamsChoice.GetValue())
 			dlg.Destroy()
 		else:
@@ -182,7 +191,7 @@ class MWScoreFrame( wx.Frame ):
 		self.Panel.Destroy()
 		self.Panel = MatchPanel( self, -1 )
 		
-		# Resume the fram update timer.
+		# Resume the frame update timer.
 		self.Timer.Start()
 		
 	# start or resume a match
@@ -200,7 +209,7 @@ class MWScoreFrame( wx.Frame ):
             except Exception as x:
                 traceback.print_exc()
                 wx.MessageBox("Exception in Reset:\r\n" + str(x), "Error", wx.OK | wx.ICON_ERROR);
-		
+
         # Reset the match
 	def MatchResetHP( self, event ):
             try:
@@ -208,6 +217,13 @@ class MWScoreFrame( wx.Frame ):
             except Exception as x:
                 traceback.print_exc()
                 wx.MessageBox("Exception in Reset:\r\n" + str(x), "Error", wx.OK | wx.ICON_ERROR);
+
+        # Match Staging
+        def MatchStaging( self, event ):
+                dlg = MatchStagingDialog( self, -1 )
+                if dlg.ShowModal() == wx.ID_OK:
+			self.ScoreServer.Match.Start()
+		dlg.Destroy()
 		
 	# Opens dialog to configure to ScoreServer's SocketServer
 	def SocketSetup( self, event ):
@@ -224,9 +240,37 @@ class MWScoreFrame( wx.Frame ):
 			self.ScoreServer.TransponderListener.KillThread()
 			self.ScoreServer.TransponderListener = MWScore.TransponderListener( self.ScoreServer, dlg.PortChoice.GetValue(), int(dlg.BaudChoice.GetValue()) )
                         if not self.ScoreServer.TransponderListener.Xbee:
-                            wx.MessageBox("Could not open Transponder port " + dlg.PortChoice.GetValue(),
+                            wx.MessageBox("Could not open Transponder port " + ScoreServer.TransponderListener.Port,
                                     "Error", wx.OK | wx.ICON_ERROR)
 		dlg.Destroy()
+
+        # Opens dialog to configure Transponder variables
+        # Only works with 2018 Transponders
+	def TransponderVar( self, event ):
+		dlg = TransponderVarDialog( self, -1 )
+		if dlg.ShowModal() == wx.ID_OK:
+                        if dlg.MatchRulesChoice.GetValue() == "Default":
+                                MatchRuleSet = 0
+                        if dlg.MatchRulesChoice.GetValue() == "Max HP Per Panel":
+                                MatchRuleSet = 1
+                        if dlg.MatchRulesChoice.GetValue() == "Healing":
+                                MatchRuleSet = 2
+                        if dlg.MatchRulesChoice.GetValue() == "Cooldown Increase":
+                                MatchRuleSet = 3
+                        self.ScoreServer.TransponderListener.WriteTransponderNewID( int(dlg.CurrentIDChoice.GetValue()), int(dlg.NewIDChoice.GetValue()) )
+                        self.ScoreServer.TransponderListener.WriteTransponder( int(dlg.NewIDChoice.GetValue()), int(dlg.SetHpChoice.GetValue()), MatchRuleSet )
+                        if not self.ScoreServer.TransponderListener.Xbee:
+                            wx.MessageBox("Could not open Transponder port " + dlg.PortChoice.GetValue(),
+                                    "Error", wx.OK | wx.ICON_ERROR)
+                dlg.Destroy()
+
+        # Reset the match
+	def TransponderHpUpdate( self, event ):
+            try:
+		self.ScoreServer.Match.UpdateTransponderHP()
+            except Exception as x:
+                traceback.print_exc()
+                wx.MessageBox("Exception in Transmit HP:\r\n" + str(x), "Error", wx.OK | wx.ICON_ERROR);
 		
 	# Kills all threads and closes the program
 	def Quit( self, event ):
@@ -262,7 +306,7 @@ class MatchDialog( wx.Dialog ):
                     self.NumTeamsChoice.SetValue(str(data.get("NumTeams", 0)))
 
 		self.MatchRulesText = wx.StaticText( self, -1, "Ruleset: " )
-                rulesChoices = ["Default","Max HP Per Panel","Healing"]
+                rulesChoices = ["Default","Max HP Per Panel","Healing","Cooldown Increase"]
 		self.MatchRulesChoice = wx.ComboBox( self, -1, style=wx.CB_DROPDOWN, choices=rulesChoices )
                 if data.get("MatchRuleSet", None) is not None:
                     self.MatchRulesChoice.SetValue(str(rulesChoices[data.get("MatchRuleSet", 0)]))
@@ -333,7 +377,8 @@ class TeamDialog( wx.Dialog ):
 		
 		self.SetSizer( TopSizer )
 		TopSizer.Fit( self )
-		
+
+
 """
 
 	SocketServerDialog
@@ -418,6 +463,120 @@ class TransponderDialog( wx.Dialog ):
 
 """
 
+	TransponderVarDialog
+
+"""
+	
+class TransponderVarDialog( wx.Dialog ):
+	
+	def __init__( self, parent, id ):
+		wx.Dialog.__init__( self, parent, id, title="Transponder Variable Setup" )
+		  
+		self.CurrentIDText = wx.StaticText( self, -1, "Current ID:" )
+		self.CurrentIDChoice = wx.TextCtrl( self, -1, "1" )
+
+		self.NewIDText = wx.StaticText( self, -1, "New ID:" )
+		self.NewIDChoice = wx.TextCtrl( self, -1, "2" )
+	
+		self.SetHpText = wx.StaticText( self, -1, "Hit Points:" )
+		self.SetHpChoice = wx.TextCtrl( self, -1, "20" )
+
+		self.MatchRulesText = wx.StaticText( self, -1, "Ruleset: " )
+                rulesChoices = ["Default","Max HP Per Panel","Healing","Cooldown Increase"]
+		self.MatchRulesChoice = wx.ComboBox( self, -1, style=wx.CB_DROPDOWN, choices=rulesChoices )
+	
+		self.CancelButton = wx.Button( self, wx.ID_CANCEL, "Cancel" )
+		self.OKButton = wx.Button( self, wx.ID_OK, "OK" )
+		
+		TopSizer = wx.BoxSizer( wx.VERTICAL )
+		CurrentIDSizer = wx.BoxSizer( wx.HORIZONTAL )
+		NewIDSizer = wx.BoxSizer( wx.HORIZONTAL )
+		SetHpSizer = wx.BoxSizer( wx.HORIZONTAL )
+		RuleSizer = wx.BoxSizer( wx.HORIZONTAL )
+		BtnSizer = wx.BoxSizer( wx.HORIZONTAL )
+		
+		CurrentIDSizer.Add( self.CurrentIDText, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+		CurrentIDSizer.Add( self.CurrentIDChoice, 2, wx.ALL, 5 )
+
+		NewIDSizer.Add( self.NewIDText, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+		NewIDSizer.Add( self.NewIDChoice, 2, wx.ALL, 5 )
+		
+		SetHpSizer.Add( self.SetHpText, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+		SetHpSizer.Add( self.SetHpChoice, 2, wx.ALL, 5 )
+
+		RuleSizer.Add( self.MatchRulesText, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5 )
+		RuleSizer.Add( self.MatchRulesChoice, 2, wx.ALL, 5 )
+		
+		BtnSizer.Add( self.CancelButton, 0, wx.ALL, 5 )
+		BtnSizer.Add( self.OKButton, 0, wx.ALL, 5 )
+		
+		TopSizer.Add( NewIDSizer, 0, wx.ALL|wx.CENTER, 5 )
+		TopSizer.Add( SetHpSizer, 0, wx.ALL|wx.CENTER, 5 )
+		TopSizer.Add( RuleSizer, 0, wx.ALL|wx.CENTER, 5 )
+		TopSizer.Add( BtnSizer, 0, wx.ALL|wx.CENTER, 5 )
+		
+		self.SetSizer( TopSizer )
+		TopSizer.Fit( self )
+
+"""
+
+	MatchStagingDialog
+
+"""
+	
+class MatchStagingDialog( wx.Dialog ):
+	
+	def __init__( self, parent, id ):
+		wx.Dialog.__init__( self, parent, id, title="Match Staging" )
+
+		self.ScoreServer = parent.ScoreServer
+		self.Match = self.ScoreServer.Match
+		self.MechList = self.ScoreServer.Match.MechList
+
+		self.MechStagingText = wx.StaticText( self, -1, "Mech Staging:" )
+		self.MechStagingText.SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+
+		# Create a Sizer, NameText, and HPText for each Mech in the match.
+		self.MechSizer = []
+		self.MechNameText = []
+		self.MechHPText = []
+		self.MechReadyButton = []
+		
+		for m in xrange(len(self.MechList)):
+			self.MechSizer.append( wx.BoxSizer( wx.HORIZONTAL ) )
+			self.MechNameText.append( wx.StaticText( self, -1, self.MechList[m].Name ) )
+			self.MechHPText.append( wx.StaticText( self, -1, str(self.MechList[m].MaxHP) ) )
+			self.MechReadyButton.append( wx.Button( self, wx.ID_ANY, "Ready" ))
+			
+			self.MechNameText[m].SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+			self.MechHPText[m].SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+	
+		self.CancelButton = wx.Button( self, wx.ID_CANCEL, "Cancel" )
+		self.OKButton = wx.Button( self, wx.ID_OK, "OK" )
+		
+		TopSizer = wx.BoxSizer( wx.VERTICAL )
+		
+		BtnSizer = wx.BoxSizer( wx.HORIZONTAL )
+		BtnSizer.Add( self.CancelButton, 0, wx.ALL, 5 )
+		BtnSizer.Add( self.OKButton, 0, wx.ALL, 5 )
+
+		TopSizer.Add( self.MechStagingText, 0, wx.ALL|wx.CENTER, 5 )
+
+                # Add all Mech Sizers to the panel's sizer
+                for m in xrange(len(self.MechList)):
+			self.MechSizer[m].Add( self.MechNameText[m], proportion=0, flag=wx.RIGHT, border=10 )
+			self.MechSizer[m].Add( self.MechHPText[m], proportion=0, flag=wx.CENTER, border=10 )
+			self.MechSizer[m].Add( self.MechReadyButton[m], proportion=0, flag=wx.ALL, border=10 )
+			TopSizer.Add( self.MechSizer[m], proportion=0, flag=wx.ALL|wx.ALIGN_CENTER, border=10 )
+		
+		TopSizer.Add( BtnSizer, 0, wx.ALL|wx.CENTER, 5 )
+
+		self.SetSizer( TopSizer )
+		TopSizer.Fit( self )
+
+		
+"""
+
 	MatchPanel
 
 """
@@ -433,7 +592,7 @@ class MatchPanel( wx.Panel ):
 		
 		# Create a MatchTimeText
 		self.MatchTimerText = MatchTimerText( self, -1, self.Match )
-		self.MatchTimerText.SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+		self.MatchTimerText.SetFont(wx.Font(64, wx.DEFAULT, wx.NORMAL, wx.BOLD))
 		
 		# Create a Sizer, NameText, and HPText for each Mech in the match.
 		self.MechSizer = []
@@ -445,8 +604,8 @@ class MatchPanel( wx.Panel ):
 			self.MechNameText.append( wx.StaticText( self, -1, self.MechList[m].Name ) )
 			self.MechHPText.append( MechHPText( self, -1, self.ScoreServer, self.MechList[m] ) )
 			
-			self.MechNameText[m].SetFont(wx.Font(30, wx.DEFAULT, wx.NORMAL, wx.BOLD))
-			self.MechHPText[m].SetFont(wx.Font(30, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+			self.MechNameText[m].SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+			self.MechHPText[m].SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
 		
 		# Create an overall sizer for the panel.
 		self.Sizer = wx.BoxSizer( wx.VERTICAL )
@@ -462,7 +621,7 @@ class MatchPanel( wx.Panel ):
 			if self.Match.MatchType != MWScore.MATCH_FFA:
 				if self.MechList[m].Team != self.MechList[m-1].Team and m != 0:
 					vstext = wx.StaticText(self, -1, "VS")
-					vstext.SetFont(wx.Font(30, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+					vstext.SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
 					self.Sizer.Add( vstext, proportion=0, flag=wx.ALL|wx.ALIGN_CENTER, border=10 )
 					
 			self.MechSizer[m].Add( self.MechNameText[m], proportion=0, flag=wx.RIGHT, border=10 )
@@ -501,11 +660,15 @@ class MechHPText( wx.StaticText ):
 		
 	def LeftClick( self, event ):
 		if not self.ScoreServer.Match.MatchOver:
-			self.ScoreServer.Log( self.Mech.AssignPenality() )
+                        self.Mech.AssignPenality()
+                        self.ScoreServer.Match.UpdateTransponderHP()
+			self.ScoreServer.Log( "Assign Hit Point Penality" )
 		
 	def RightClick( self, event ):
 		if not self.ScoreServer.Match.MatchOver:
-			self.ScoreServer.Log( self.Mech.ResetHP() )	
+                        self.Mech.ResetHP()
+                        self.ScoreServer.Match.UpdateTransponderHP()
+			self.ScoreServer.Log( "Reset HP" )	
 
 """
 
@@ -541,6 +704,7 @@ class MatchTimerText( wx.StaticText ):
 		if not self.Match.MatchOver:
 			self.Match.Pause()
 			self.Match.SetTime( self.Match.MatchLength )
+			
 				
 if __name__ == "__main__":
 	app = wx.App(0)
