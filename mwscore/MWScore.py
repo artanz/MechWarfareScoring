@@ -30,7 +30,7 @@ class ScoreServer():
                 self.Log( "R-TEAM Varient \r\n" )
                 
                 self.MechList = MechList().CreateFromConfig( "mechs.conf" )             
-                defaultPort = "COM3"
+                defaultPort = "COM7"
                 if os.name == 'posix':
                     defaultPort = "/dev/ttyUSB0"
                 self.TransponderListener = TransponderListener( self, defaultPort, 38400 )
@@ -222,7 +222,7 @@ class SocketClient( ScoreModule ):
 
 class TransponderListener( ScoreModule ):
 
-        def __init__( self, server, port="COM3", baud=38400 ):
+        def __init__( self, server, port="COM7", baud=38400 ):
                 ScoreModule.__init__( self, server )
                 
                 # Log the creation of a new ScoreModule.

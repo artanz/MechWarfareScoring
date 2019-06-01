@@ -23,7 +23,6 @@ class MWScoreFrame( wx.Frame ):
 	ID_MATCHPAUSE = wx.NewId()
 	ID_MATCHRESET = wx.NewId()
 	ID_MATCHRESETHP = wx.NewId()
-	ID_MATCHRESTAGING = wx.NewId()
 	ID_TRANSPONDERSETUP = wx.NewId()
 	ID_SOCKETSETUP = wx.NewId()
 	ID_TRANSPONDERVAR = wx.NewId()
@@ -60,12 +59,10 @@ class MWScoreFrame( wx.Frame ):
 		self.MatchMenu.Append( self.ID_MATCHPAUSE, "Pause" )
 		self.MatchMenu.Append( self.ID_MATCHRESET, "Reset" )
 		self.MatchMenu.Append( self.ID_MATCHRESETHP, "Reset HP" )
-		self.MatchMenu.Append( self.ID_MATCHRESTAGING, "Match Staging" )
 		self.Bind( wx.EVT_MENU, self.MatchSetup, id=self.ID_MATCHSETUP )
 		self.Bind( wx.EVT_MENU, self.MatchStart, id=self.ID_MATCHSTART )
 		self.Bind( wx.EVT_MENU, self.MatchPause, id=self.ID_MATCHPAUSE )
 		self.Bind( wx.EVT_MENU, self.MatchReset, id=self.ID_MATCHRESET )
-		self.Bind( wx.EVT_MENU, self.MatchStaging, id=self.ID_MATCHRESTAGING )
 		
 		self.MenuBar.Append( self.FileMenu, "&File" )
 		self.MenuBar.Append( self.MatchMenu, "&Match" )
@@ -78,9 +75,12 @@ class MWScoreFrame( wx.Frame ):
 		# Panel
 		self.Panel = MatchPanel( self, -1 )
 		
+		# Fix for flicker
+		self.SetDoubleBuffered(True)
+		
 		# Frame Update Timer
 		self.Timer = wx.Timer( self, self.FRAME_UPDATE_TIMER_ID )
-		self.Timer.Start(100)
+		self.Timer.Start(1000)
 		wx.EVT_TIMER( self, self.FRAME_UPDATE_TIMER_ID, self.OnTimer )
 		
 		self.Show( True )
@@ -217,13 +217,6 @@ class MWScoreFrame( wx.Frame ):
             except Exception as x:
                 traceback.print_exc()
                 wx.MessageBox("Exception in Reset:\r\n" + str(x), "Error", wx.OK | wx.ICON_ERROR);
-
-        # Match Staging
-        def MatchStaging( self, event ):
-                dlg = MatchStagingDialog( self, -1 )
-                if dlg.ShowModal() == wx.ID_OK:
-			self.ScoreServer.Match.Start()
-		dlg.Destroy()
 		
 	# Opens dialog to configure to ScoreServer's SocketServer
 	def SocketSetup( self, event ):
@@ -510,6 +503,7 @@ class TransponderVarDialog( wx.Dialog ):
 		BtnSizer.Add( self.CancelButton, 0, wx.ALL, 5 )
 		BtnSizer.Add( self.OKButton, 0, wx.ALL, 5 )
 		
+		TopSizer.Add( CurrentIDSizer, 0, wx.ALL|wx.CENTER, 5 )
 		TopSizer.Add( NewIDSizer, 0, wx.ALL|wx.CENTER, 5 )
 		TopSizer.Add( SetHpSizer, 0, wx.ALL|wx.CENTER, 5 )
 		TopSizer.Add( RuleSizer, 0, wx.ALL|wx.CENTER, 5 )
@@ -517,63 +511,6 @@ class TransponderVarDialog( wx.Dialog ):
 		
 		self.SetSizer( TopSizer )
 		TopSizer.Fit( self )
-
-"""
-
-	MatchStagingDialog
-
-"""
-	
-class MatchStagingDialog( wx.Dialog ):
-	
-	def __init__( self, parent, id ):
-		wx.Dialog.__init__( self, parent, id, title="Match Staging" )
-
-		self.ScoreServer = parent.ScoreServer
-		self.Match = self.ScoreServer.Match
-		self.MechList = self.ScoreServer.Match.MechList
-
-		self.MechStagingText = wx.StaticText( self, -1, "Mech Staging:" )
-		self.MechStagingText.SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
-
-		# Create a Sizer, NameText, and HPText for each Mech in the match.
-		self.MechSizer = []
-		self.MechNameText = []
-		self.MechHPText = []
-		self.MechReadyButton = []
-		
-		for m in xrange(len(self.MechList)):
-			self.MechSizer.append( wx.BoxSizer( wx.HORIZONTAL ) )
-			self.MechNameText.append( wx.StaticText( self, -1, self.MechList[m].Name ) )
-			self.MechHPText.append( wx.StaticText( self, -1, str(self.MechList[m].MaxHP) ) )
-			self.MechReadyButton.append( wx.Button( self, wx.ID_ANY, "Ready" ))
-			
-			self.MechNameText[m].SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
-			self.MechHPText[m].SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
-	
-		self.CancelButton = wx.Button( self, wx.ID_CANCEL, "Cancel" )
-		self.OKButton = wx.Button( self, wx.ID_OK, "OK" )
-		
-		TopSizer = wx.BoxSizer( wx.VERTICAL )
-		
-		BtnSizer = wx.BoxSizer( wx.HORIZONTAL )
-		BtnSizer.Add( self.CancelButton, 0, wx.ALL, 5 )
-		BtnSizer.Add( self.OKButton, 0, wx.ALL, 5 )
-
-		TopSizer.Add( self.MechStagingText, 0, wx.ALL|wx.CENTER, 5 )
-
-                # Add all Mech Sizers to the panel's sizer
-                for m in xrange(len(self.MechList)):
-			self.MechSizer[m].Add( self.MechNameText[m], proportion=0, flag=wx.RIGHT, border=10 )
-			self.MechSizer[m].Add( self.MechHPText[m], proportion=0, flag=wx.CENTER, border=10 )
-			self.MechSizer[m].Add( self.MechReadyButton[m], proportion=0, flag=wx.ALL, border=10 )
-			TopSizer.Add( self.MechSizer[m], proportion=0, flag=wx.ALL|wx.ALIGN_CENTER, border=10 )
-		
-		TopSizer.Add( BtnSizer, 0, wx.ALL|wx.CENTER, 5 )
-
-		self.SetSizer( TopSizer )
-		TopSizer.Fit( self )
-
 		
 """
 
@@ -592,7 +529,7 @@ class MatchPanel( wx.Panel ):
 		
 		# Create a MatchTimeText
 		self.MatchTimerText = MatchTimerText( self, -1, self.Match )
-		self.MatchTimerText.SetFont(wx.Font(64, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+		self.MatchTimerText.SetFont(wx.Font(80, wx.DEFAULT, wx.NORMAL, wx.BOLD))
 		
 		# Create a Sizer, NameText, and HPText for each Mech in the match.
 		self.MechSizer = []
@@ -604,8 +541,8 @@ class MatchPanel( wx.Panel ):
 			self.MechNameText.append( wx.StaticText( self, -1, self.MechList[m].Name ) )
 			self.MechHPText.append( MechHPText( self, -1, self.ScoreServer, self.MechList[m] ) )
 			
-			self.MechNameText[m].SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
-			self.MechHPText[m].SetFont(wx.Font(50, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+			self.MechNameText[m].SetFont(wx.Font(72, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+			self.MechHPText[m].SetFont(wx.Font(72, wx.DEFAULT, wx.NORMAL, wx.BOLD))
 		
 		# Create an overall sizer for the panel.
 		self.Sizer = wx.BoxSizer( wx.VERTICAL )
@@ -635,7 +572,9 @@ class MatchPanel( wx.Panel ):
 	
 	# Refresh the TimeText and all instances of MechHPText
 	def Refresh( self ):
+	
 		self.MatchTimerText.Refresh()
+		
 		for m in self.MechHPText:
 			m.Refresh()
 			
@@ -647,6 +586,8 @@ class MatchPanel( wx.Panel ):
 
 class MechHPText( wx.StaticText ):
 
+	oldHP = 999
+
 	def __init__( self, parent, id, server, mech ):
 		wx.StaticText.__init__( self, parent )
 		
@@ -654,9 +595,15 @@ class MechHPText( wx.StaticText ):
 		self.Mech = mech
 		self.Bind( wx.EVT_LEFT_DOWN, self.LeftClick )
 		self.Bind( wx.EVT_RIGHT_DOWN, self.RightClick )
+		self.oldHP = 99;
+		self.SetLabel( '--' )
 	
 	def Refresh( self ):
-		self.SetLabel( str(self.Mech.HP) )
+		if self.Mech.HP != MechHPText.oldHP:
+			self.SetLabel( str(self.Mech.HP) )
+		else:
+			pass
+		self.oldHP = self.Mech.HP
 		
 	def LeftClick( self, event ):
 		if not self.ScoreServer.Match.MatchOver:
@@ -678,20 +625,30 @@ class MechHPText( wx.StaticText ):
 
 class MatchTimerText( wx.StaticText ):
 
+	lastSecond = 0
+
 	def __init__( self, parent, id, match ):
 			wx.StaticText.__init__( self, parent )
 			
 			self.Match = match
 			self.Bind( wx.EVT_LEFT_DOWN, self.LeftClick )
 			self.Bind( wx.EVT_RIGHT_DOWN, self.RightClick )
+			MatchTimerText.lastSecond = 0
+			self.SetLabel('--:--')
 			
 	def Refresh( self ):
 		time = self.Match.Time
 		min = time / 600
 		sec = int((time -(min * 600)) * .1)
-		mic = time - (min * 600) - (sec * 10)
-	
-		self.SetLabel( str(min).rjust(2,"0") + ":" + str(sec).rjust(2,"0") + ":" + str(mic) )
+		#mic = time - (min * 600) - (sec * 10)
+		
+		# If the match time (seconds) has changed since the last refresh update the string
+		if sec != MatchTimerText.lastSecond:
+			self.SetLabel( str(min).rjust(2,"0") + ":" + str(sec).rjust(2,"0")) # + ":" + str(mic) )
+		else:
+			pass
+		
+		MatchTimerText.lastSecond = sec
 		
 	def LeftClick( self, event ):
 		if not self.Match.MatchOver:
