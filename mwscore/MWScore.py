@@ -27,7 +27,7 @@ class ScoreServer():
         def __init__( self ):
                 
                 self.Log( "Mech Warfare MWScore Scoring System v2.0 \n" )
-                self.Log( "R-TEAM Varient \r\n" )
+                self.Log( "R-TEAM Version \r\n" )
                 
                 self.MechList = MechList().CreateFromConfig( "mechs.conf" )             
                 defaultPort = "COM7"
@@ -133,7 +133,7 @@ class SocketServer( ScoreModule ):
                 for client in self.Clients:
                         try:
                                 client.send( msg + "\n" )
-                        except socket.error, e:
+                        except:
                                 self.ScoreServer.Log( "Disconnecting client " + repr(client.getpeername()) )
                                 self.Clients.remove( client )
                                 
@@ -210,7 +210,7 @@ class SocketClient( ScoreModule ):
                                 names = []
                                 hp = []
                         
-                                for m in xrange( self.NumMechs ):
+                                for m in range( self.NumMechs ):
                                         names.append( info[3+(3*m)] )
                                         hp.append( int(info[4+(3*m)]) )
                                 
@@ -222,7 +222,7 @@ class SocketClient( ScoreModule ):
 
 class TransponderListener( ScoreModule ):
 
-        def __init__( self, server, port="COM7", baud=38400 ):
+        def __init__( self, server, port="COM2", baud=38400 ):
                 ScoreModule.__init__( self, server )
                 
                 # Log the creation of a new ScoreModule.
@@ -348,7 +348,7 @@ class Match( ScoreModule ):
                                 self.NumTeams = m.Team
                 
                 # Create instace of team for each team and append to self.Teams
-                for t in xrange(self.NumTeams):
+                for t in range(self.NumTeams):
                         team = []
                         for m in self.ScoreServer.MechList.MechByTeam( t+1 ):
                                 team.append( m )
@@ -389,7 +389,7 @@ class Match( ScoreModule ):
                 else:
                         
                         # Reset all mechs in the server's mechlist as NOT "InMach".
-                        for m in xrange(len(self.ScoreServer.MechList.List)):
+                        for m in range(len(self.ScoreServer.MechList.List)):
                                 self.ScoreServer.MechList.List[m].InMatch = False
                         
                         # Set mechs in the module's mech list as "InMatch".
