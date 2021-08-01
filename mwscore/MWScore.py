@@ -30,7 +30,7 @@ class ScoreServer():
                 self.Log( "R-TEAM Version \r\n" )
                 
                 self.MechList = MechList().CreateFromConfig( "mechs.conf" )             
-                defaultPort = "COM7"
+                defaultPort = "COM3"
                 if os.name == 'posix':
                     defaultPort = "/dev/ttyUSB0"
                 self.TransponderListener = TransponderListener( self, defaultPort, 38400 )
@@ -72,7 +72,8 @@ class ScoreModule():
                 pass
                 
         def StartThread( self ):
-                if not self.Thread.isAlive():
+                # ( < Python 3.9) if not self.Thread.isAlive():
+                if not self.Thread.is_alive():
                         self.Thread.start()
                 
         def KillThread( self ):
@@ -297,21 +298,33 @@ class TransponderListener( ScoreModule ):
 
         # Send message to setup transponder on mech
         def WriteTransponder( self, mechid, hp, rules ):
-                mechstr1 = chr( mechid )
-                mechstr2 = chr( 255 - mechid )
-                hpstr = chr( hp )
-                rulesstr = chr( rules )
-                self.Xbee.write( "\x55" + mechstr1 + mechstr2 + hpstr + rulesstr )
-                self.ScoreServer.Log( "Wrote Transponder Message : " + "\x55" + mechstr1 + mechstr2 + hpstr + rulesstr )
+                mechstr1 = mechid
+                mechstr2 = 255 - mechid
+                hpstr = hp
+                rulesstr = rules
+                packet = bytearray()
+                packet.append( 85 )
+                packet.append( mechstr1 )
+                packet.append( mechstr2 )
+                packet.append( hpstr )
+                packet.append( rulesstr )
+                self.Xbee.write( packet )
+                self.ScoreServer.Log( "Adjust Mech ID " + str(mechid) + " to " + str(hp) + " HP"  )
 
         # Send message to setup transponder ID on mech
         def WriteTransponderNewID( self, mechid, newmechid ):
-                mechstr1 = chr( mechid )
-                mechstr2 = chr( 255 - mechid )
-                newmechstr1 = chr( newmechid )
-                newmechstr2 = chr( 255 - newmechid )
-                self.Xbee.write( "\xA5" + mechstr1 + mechstr2 + newmechstr1 + newmechstr2 )
-                self.ScoreServer.Log( "Wrote ID Transponder Message : " + "\xA5" + mechstr1 + mechstr2 + newmechstr1 + newmechstr2 )
+                mechstr1 = mechid
+                mechstr2 = 255 - mechid
+                newmechstr1 = newmechid
+                newmechstr2 = 255 - newmechid
+                packet = bytearray()
+                packet.append( 165 )
+                packet.append( mechstr1 )
+                packet.append( mechstr2 )
+                packet.append( newmechstr1 )
+                packet.append( newmechstr2 )
+                self.Xbee.write( packet )
+                self.ScoreServer.Log( "Adjust Mech ID " + str(mechid) + " to Mech ID" + str(newmechid) )
         
 class Match( ScoreModule ):
 
@@ -376,7 +389,8 @@ class Match( ScoreModule ):
         def Start( self ):
 
                 # Module thread is already alive...
-                if self.Thread.isAlive():
+                # ( < Python 3.9) if self.Thread.isAlive():
+                if self.Thread.is_alive():
                         
                         # Set mechs in the module's mech list as "InMatch".
                         for m in self.MechList:
