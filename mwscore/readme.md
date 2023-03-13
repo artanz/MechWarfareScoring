@@ -2,11 +2,11 @@ Mech Warfare Scoring Server
 
 Edited by R-TEAM Robotics
 
-Download and install latest Python 3.x: http://www.python.org/download/releases/
+Download and install Python 3.10.10: https://www.python.org/downloads/ (wxPython is broken with latest python 3.11.2 as of 3/12/23, may of been fixed since)
 
-Download and install latest wxPython: http://www.wxpython.org/download.php
+Download and install latest wxPython: https://www.wxpython.org/pages/downloads/ (pip install -U wxPython)
 
-Download and install latest PySerial: https://pypi.python.org/pypi/pyserial
+Download and install latest PySerial: https://pypi.org/project/pyserial/ (pip install pyserial)
 
 More detailed instructions here: https://learn.adafruit.com/arduino-lesson-17-email-sending-movement-detector/installing-python-and-pyserial
 
