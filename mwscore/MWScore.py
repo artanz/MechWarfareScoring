@@ -72,7 +72,7 @@ class ScoreModule():
                 pass
                 
         def StartThread( self ):
-                if not self.Thread.isAlive():
+                if not self.Thread.is_alive():
                         self.Thread.start()
                 
         def KillThread( self ):
@@ -381,7 +381,7 @@ class Match( ScoreModule ):
         def Start( self ):
 
                 # Module thread is already alive...
-                if self.Thread.isAlive():
+                if self.Thread.is_alive():
                         
                         # Set mechs in the module's mech list as "InMatch".
                         for m in self.MechList:
