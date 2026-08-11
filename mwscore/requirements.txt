@@ -1,0 +1,9 @@
+# Mech Warfare Scoring System - Python dependencies
+#
+# Install with:  pip install -r requirements.txt
+#
+# Note: wxPython wheels are not available for every Python version.
+# Python 3.10 is the recommended interpreter for this project.
+
+wxPython>=4.2.0
+pyserial>=3.5

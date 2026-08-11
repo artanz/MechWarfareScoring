@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mech Warfare Score Overlay</title>
+<style>
+  body {
+    margin: 0;
+    background: transparent;
+    font-family: "Arial", "Helvetica Neue", sans-serif;
+    color: #ffffff;
+  }
+  .container { padding: 20px; }
+  .timer {
+    font-size: 72px;
+    font-weight: bold;
+    text-align: center;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+  }
+  .status {
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    margin: 4px 0 12px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+  }
+  .team {
+    background: rgba(0,0,0,0.55);
+    border: 2px solid #555555;
+    border-radius: 10px;
+    margin: 10px 0;
+    padding: 10px 16px;
+  }
+  .team-name {
+    font-size: 26px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 8px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+  }
+  .vs {
+    text-align: center;
+    font-size: 34px;
+    font-weight: bold;
+    margin: 4px 0;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+  }
+  .mech-row { display: flex; align-items: center; margin: 6px 0; }
+  .mech-name { width: 200px; font-size: 22px; font-weight: bold; }
+  .bar-wrap {
+    flex: 1;
+    height: 26px;
+    background: #1e1e1e;
+    border: 1px solid #5a5a5a;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .bar {
+    height: 100%;
+    width: 0%;
+    transition: width 0.2s ease;
+  }
+  .mech-hp {
+    width: 70px;
+    text-align: right;
+    font-size: 22px;
+    font-weight: bold;
+    margin-left: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="timer" id="timer">--:--</div>
+  <div class="status" id="status">WAITING</div>
+  <div id="teams"></div>
+</div>
+
+<script>
+  // Team header colors, matching the GUI.
+  var TEAM_COLORS = ['#d23c3c','#3c6edc','#46aa50','#dcaf2d','#aa50b4','#3cb4b4','#e67828','#969696'];
+
+  function fmtTime(t) {
+    t = Math.max(0, Math.floor(t));
+    var m = Math.floor(t / 600);
+    var s = Math.floor((t % 600) / 10);
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function statusColor(s) {
+    switch (s) {
+      case 'MATCH OVER':   return '#cd3737';
+      case 'SUDDEN DEATH': return '#e1af2d';
+      case 'PAUSED':       return '#969696';
+      default:             return '#3cb450';
+    }
+  }
+
+  function barColor(frac) {
+    if (frac > 0.5) return '#3cb450';
+    if (frac > 0.25) return '#e1af2d';
+    return '#cd3737';
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  async function load() {
+    try {
+      var r = await fetch('obs_score.json?t=' + Date.now());
+      var d = await r.json();
+
+      document.getElementById('timer').textContent = fmtTime(d.time);
+
+      var st = document.getElementById('status');
+      st.textContent = d.status || '';
+      st.style.color = statusColor(d.status);
+
+      var teams = d.teams || [];
+      var html = '';
+      teams.forEach(function (team, i) {
+        var color = TEAM_COLORS[(team.team - 1) % TEAM_COLORS.length];
+        html += '<div class="team"><div class="team-name" style="color:' + color + '">' + esc(team.name) + '</div>';
+        (team.mechs || []).forEach(function (m) {
+          var frac = m.maxhp > 0 ? Math.max(0, Math.min(1, m.hp / m.maxhp)) : 0;
+          html += '<div class="mech-row">' +
+                  '<div class="mech-name">' + esc(m.name) + '</div>' +
+                  '<div class="bar-wrap"><div class="bar" style="width:' + (frac * 100) + '%;background:' + barColor(frac) + '"></div></div>' +
+                  '<div class="mech-hp">' + m.hp + '</div>' +
+                  '</div>';
+        });
+        html += '</div>';
+        // "VS" separator between teams, except in Free For All matches.
+        if (i < teams.length - 1 && d.match_type !== 2) {
+          html += '<div class="vs">VS</div>';
+        }
+      });
+      document.getElementById('teams').innerHTML = html;
+    } catch (e) {
+      // No data yet (GUI not running or file not written) - keep last display.
+    }
+  }
+
+  load();
+  setInterval(load, 500);
+</script>
+</body>
+</html>

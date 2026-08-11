@@ -30,7 +30,7 @@ class ScoreServer():
                 self.Log( "R-TEAM Version \r\n" )
                 
                 self.MechList = MechList().CreateFromConfig( "mechs.conf" )             
-                defaultPort = "COM8"
+                defaultPort = "COM4"
                 if os.name == 'posix':
                     defaultPort = "/dev/ttyUSB0"
                 self.TransponderListener = TransponderListener( self, defaultPort, 38400 )
@@ -51,6 +51,10 @@ class ScoreServer():
                 self.TransponderListener.KillThread()
                 self.SocketServer.KillThread()
                 self.Match.KillThread()
+                # Wait for the threads to finish so the process can exit cleanly.
+                for module in ( self.TransponderListener, self.SocketServer, self.Match ):
+                        if module.Thread.is_alive():
+                                module.Thread.join( timeout=2 )
 
 """
 
@@ -130,7 +134,7 @@ class SocketServer( ScoreModule ):
         
         # Bradcast a message to all of the servers clients. Removes any clients that produce a socket error.
         def Broadcast( self, msg ):
-                for client in self.Clients:
+                for client in list(self.Clients):
                         try:
                                 client.send( msg + "\n" )
                         except:
@@ -281,10 +285,14 @@ class TransponderListener( ScoreModule ):
                         
                         # Check for valid packet and assign hit if valid.
                         if ( mechidh + mechidl ) == 0xff:
-                                result = self.ScoreServer.MechList.MechByID(mechidh).AdjustHP(mechhp)
-                                self.ScoreServer.Log( result )
+                                mech = self.ScoreServer.MechList.MechByID(mechidh)
+                                if mech is not None:
+                                        result = mech.AdjustHP(mechhp)
+                                        self.ScoreServer.Log( result )
+                                else:
+                                        self.ScoreServer.Log( "Hit from unknown mech ID " + str(mechidh) + " (ignored)" )
                         else:
-                                self.ScoreServer.Log( "Failed packet!", mechidl, mechidh )
+                                self.ScoreServer.Log( "Failed packet! ID high=" + str(mechidh) + " ID low=" + str(mechidl) )
         
                 except Exception as x:
                     traceback.print_exc();
@@ -467,7 +475,7 @@ class Match( ScoreModule ):
                                                 msg += str(m.Name) + " "
                                         msg += ") wins!"
                                         
-                                        self.MatchOver == True
+                                        self.MatchOver = True
                                         self.KillThread()
                                         self.ScoreServer.Log( msg )
                                         return
@@ -479,7 +487,7 @@ class Match( ScoreModule ):
                                                 msg += str(m.Name) + " "
                                         msg += ") wins!"
                                         
-                                        self.MatchOver == True
+                                        self.MatchOver = True
                                         self.KillThread()
                                         self.ScoreServer.Log( msg )
                                         return
@@ -500,7 +508,7 @@ class Match( ScoreModule ):
                                                 msg += str(m.Name) + " "
                                         msg += ") wins!"
                 
-                                        self.MatchOver == True
+                                        self.MatchOver = True
                                         self.KillThread()
                                         self.ScoreServer.Log( msg ) 
                                         return
@@ -525,11 +533,12 @@ class Match( ScoreModule ):
 
 class Mech():
 
-        def __init__( self, id=0, name="Dummy", hp=20, team=0):
+        def __init__( self, id=0, name="Dummy", hp=20, team=0, team_name="Dummy"):
                 self.ID = id
                 self.Name = name
                 self.MaxHP = hp
                 self.Team = team
+                self.TeamName = team_name 
                 
                 self.HP = self.MaxHP
                 self.InMatch = False
@@ -567,7 +576,7 @@ class Mech():
                 return "HP adjusted on ID# " + str(self.ID) + " " + str(self.Name) + " HP=" + str(self.HP)
                 
         def __repr__( self ):
-                return repr( (self.ID, self.Name, self.HP) )
+                return repr( (self.ID, self.Name, self.HP, self.TeamName) )
 
 """
 
@@ -598,7 +607,7 @@ class MechList():
                         # Attempt to create and instance of mech from the line. 
                         try:
                                 info = line.split( ":" )
-                                self.List.append( Mech( int(info[0]), info[1], int(info[2]) ) )
+                                self.List.append( Mech( int(info[0]), info[1], int(info[2]), 0 , info[3] ) )
                         except:
                                 pass
                 
@@ -638,8 +647,9 @@ class MechList():
         # Return instance(s) of mech from list that are currently in a match.   
         def MechByInMatch( self ):
                 tmplist = []            
-                for m in self.InMatch:
-                        tmplist.append( m )
+                for m in self.List:
+                        if m.InMatch:
+                                tmplist.append( m )
                 return tmplist
                 
 """
